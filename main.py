@@ -7,8 +7,11 @@ IMG_PATH = "azur2021527224121.png"
 
 img = cv.imread(IMG_PATH, 0)
 gray_img = Spatial.rgb2gray(img)
-histogram = Spatial.get_histogram(gray_img)
-Spatial.plot_histogram(histogram)
-# cv.imshow('img', out.gray())
-# cv.waitKey(0)
+out = Spatial.histogram_equalize(gray_img)
+in_histogram = Spatial.get_histogram(gray_img)
+out_histogram = Spatial.get_histogram(out)
+Spatial.plot_histogram(in_histogram, title='in')
+Spatial.plot_histogram(out_histogram, title='out')
+cv.imshow('img', out)
+cv.waitKey(0)
 
