@@ -140,3 +140,25 @@ def histogram_matching(in_pic, match):
         i[...] = in_transform[i]
         i[...] = match_transform_inverse[i]
     return out
+
+
+def image_convolution(in_pic, kernel):
+    in_pic_shape = in_pic.shape
+    out = np.zeros((in_pic_shape[0] + kernel.shape[0] - 1, in_pic_shape[1] + kernel.shape[1] - 1), dtype=np.uint8)
+    index = int((kernel.shape[0]-1)/2), int((kernel.shape[1]-1)/2)
+    out[index[0]:index[0]+in_pic_shape[0], index[1]:index[1]+in_pic_shape[1]] = in_pic
+    out_copy = out.copy()
+    for i in range(index[0], in_pic_shape[0]+index[0]):
+        for j in range(index[1], in_pic_shape[1]+index[1]):
+            convolution_sum = 0
+            for s in range(-index[0], index[0]+1):
+                for t in range(-index[1], index[1]+1):
+                    convolution_sum += out_copy[i-s][j-t] * kernel[index[0]+s][index[1]+t]
+            out[i][j] = round(convolution_sum)
+    return out
+
+
+def smoothing_filter(in_pic, kernel_shape, kernel_type='box'):
+    kernel = np.ones(shape=kernel_shape) / (kernel_shape[0] * kernel_shape[1])
+    out = image_convolution(in_pic, kernel)
+    return out
