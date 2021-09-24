@@ -107,7 +107,7 @@ def cdf(in_pic_histogram):
     temp = 0
     for i in range(scale):
         temp = temp + in_pic_histogram[i]
-        transform[i] = round((scale - 1) * temp)
+        transform[i] = (scale - 1) * temp
     return transform
 
 
@@ -129,7 +129,7 @@ def histogram_matching(in_pic, match):
     match_transform_inverse = np.zeros(match_transform.size, dtype=np.uint8)
     for i in range(match_transform.size):
         j = match_transform[-i-1]
-        match_transform_inverse[j] = i
+        match_transform_inverse[j] = 255 - i
     for i in range(match_transform_inverse.size):
         if i == 0:
             pass
