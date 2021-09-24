@@ -100,8 +100,8 @@ def bit_plane_slicing(in_pic, layer):
     return out
 
 
-def histogram_equalize(in_pic):
-    out = in_pic.copy()
+# get the cumulative distribution function(CDF) of in_pic.
+def cdf(in_pic):
     in_pic_histogram = get_histogram(in_pic)
     scale = in_pic_histogram.size
     transform = np.zeros(scale, dtype=np.uint8)
@@ -109,6 +109,19 @@ def histogram_equalize(in_pic):
     for i in range(scale):
         temp = temp + in_pic_histogram[i]
         transform[i] = round((scale - 1) * temp)
+    return transform
+
+
+def histogram_equalize(in_pic):
+    out = in_pic.copy()
+    transform = cdf(in_pic)
     for i in np.nditer(out, op_flags=['readwrite']):
         i[...] = transform[i]
     return out
+
+
+# variable match is a given histogram for histogram matching.
+def histogram_matching(in_pic, match):
+    out = in_pic.copy()
+    in_transform = cdf(in_pic)
+    match_transform = cdf(match)
