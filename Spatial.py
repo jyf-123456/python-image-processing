@@ -9,9 +9,11 @@ import numpy as np
 def rgb2gray(in_pic):
     if in_pic.ndim == 2:
         out = in_pic.copy()
+
     else:
         out = in_pic[:, :, 0] * 0.114 + in_pic[:, :, 1] * 0.587 + in_pic[:, :, 2] * 0.229
         out = out.astype(np.uint8)
+
     return out
 
 
@@ -21,6 +23,7 @@ def get_histogram(in_pic, scale=256):
     pic_size = in_pic.size
     for i in in_pic.flat:
         histogram[i] += 1
+
     histogram /= pic_size
     return histogram
 
@@ -69,13 +72,18 @@ def contrast_stretching(in_pic, in_low, in_high, out_low, out_high):
         for j in range(pic_shape[1]):
             gray_in = in_pic[i][j]
             gray_out = 0
+
             if (gray_in < in_low) and (gray_in > 0):
                 gray_out = round(slope_1 * gray_in)
+
             elif (gray_in < in_high) and (gray_in > in_low):
                 gray_out = round(out_low + slope_2 * (gray_in - in_low))
+
             elif (gray_in < 255) and (gray_in > in_high):
                 gray_out = round(out_high + slope_3 * (gray_in - in_high))
+
             out[i][j] = gray_out
+
     out = out.astype(np.uint8)
     return out
 
@@ -86,6 +94,7 @@ def gray_level_slicing(in_pic, in_low, in_high, constant):
     for i in np.nditer(out, op_flags=['readwrite']):
         if (i > in_low) and (i < in_high):
             i[...] = constant
+
     return out
 
 
@@ -97,6 +106,7 @@ def bit_plane_slicing(in_pic, layer):
         bin_value = bin(i)[2:].zfill(8)
         layer_bit = bin_value[-(int(layer)+1)]
         i[...] = int(layer_bit) * 255
+
     return out
 
 
@@ -108,6 +118,7 @@ def cdf(in_pic_histogram):
     for i in range(scale):
         temp = temp + in_pic_histogram[i]
         transform[i] = (scale - 1) * temp
+
     return transform
 
 
@@ -117,6 +128,7 @@ def histogram_equalize(in_pic):
     transform = cdf(in_pic_histogram)
     for i in np.nditer(out, op_flags=['readwrite']):
         i[...] = transform[i]
+
     return out
 
 
@@ -130,35 +142,124 @@ def histogram_matching(in_pic, match):
     for i in range(match_transform.size):
         j = match_transform[-i-1]
         match_transform_inverse[j] = 255 - i
+
     for i in range(match_transform_inverse.size):
         if i == 0:
             pass
+
         else:
             if match_transform_inverse[i] == 0:
                 match_transform_inverse[i] = match_transform_inverse[i-1]
+
     for i in np.nditer(out, op_flags=['readwrite']):
         i[...] = in_transform[i]
         i[...] = match_transform_inverse[i]
+
     return out
 
 
-def image_convolution(in_pic, kernel):
+# default padding of edge is 0.
+# operate_type is 'linear', means convolution.
+# when operate_type is 'order_statistic', just require kernel's shape.
+def image_kernel_operation(in_pic, operate_type='linear', kernel=None):
     in_pic_shape = in_pic.shape
-    out = np.zeros((in_pic_shape[0] + kernel.shape[0] - 1, in_pic_shape[1] + kernel.shape[1] - 1), dtype=np.uint8)
-    index = int((kernel.shape[0]-1)/2), int((kernel.shape[1]-1)/2)
+    out = np.zeros((in_pic_shape[0] + kernel.shape[0] - 1, in_pic_shape[1] + kernel.shape[1] - 1), dtype=np.int32)
+    index = kernel.shape[0]//2, kernel.shape[1]//2
     out[index[0]:index[0]+in_pic_shape[0], index[1]:index[1]+in_pic_shape[1]] = in_pic
     out_copy = out.copy()
-    for i in range(index[0], in_pic_shape[0]+index[0]):
-        for j in range(index[1], in_pic_shape[1]+index[1]):
-            convolution_sum = 0
-            for s in range(-index[0], index[0]+1):
-                for t in range(-index[1], index[1]+1):
-                    convolution_sum += out_copy[i-s][j-t] * kernel[index[0]+s][index[1]+t]
-            out[i][j] = round(convolution_sum)
+    if operate_type == 'order_statistic':
+        for i in range(index[0], in_pic_shape[0] + index[0]):
+            for j in range(index[1], in_pic_shape[1] + index[1]):
+                temp = out_copy[i-index[0]:i+index[0], j-index[1]:j+index[1]]
+                temp_median = np.median(temp)
+                out[i][j] = temp_median.astype(np.uint8)
+
+    else:
+        for i in range(index[0], in_pic_shape[0]+index[0]):
+            for j in range(index[1], in_pic_shape[1]+index[1]):
+                convolution_sum = 0
+
+                for s in range(-index[0], index[0]+1):
+                    for t in range(-index[1], index[1]+1):
+                        convolution_sum += out_copy[i-s][j-t] * kernel[index[0]+s][index[1]+t]
+
+                out[i][j] = round(convolution_sum)
+
+    if np.min(out) < 0:
+        out = out - np.min(out)
+        for i in np.nditer(out, op_flags=['readwrite']):
+            if i > 255:
+                i[...] = 255
+
+    out = out.astype(np.uint8)
+    return out[index[0]:index[0]+in_pic_shape[0], index[1]:index[1]+in_pic_shape[1]]
+
+
+# generate gaussian kernel, it's always a square.
+def gauss_kernel(kernel_size, sigma):
+    kernel = np.zeros((kernel_size, kernel_size))
+    center = kernel_size // 2
+    if sigma <= 0:
+        sigma = ((kernel_size - 1) * 0.5 - 1) * 0.3 + 0.8
+
+    s = sigma ** 2
+    sum_val = 0
+    for i in range(kernel_size):
+        for j in range(kernel_size):
+            x, y = i - center, j - center
+
+            kernel[i, j] = np.exp(-(x ** 2 + y ** 2) / 2 * s)
+            sum_val += kernel[i, j]
+
+    kernel = kernel / sum_val
+
+    return kernel
+
+
+# allow box filtering and gaussian filtering.
+# default box filtering.
+def smoothing_filter(in_pic, kernel_shape, kernel_type='box', sigma=1):
+    if kernel_type == 'gaussian':
+        try:
+            if kernel_shape[0] != kernel_shape[1]:
+                raise Exception("given kernel shape is not a square.")
+
+        except Exception as e:
+            print(e)
+            return None
+
+        else:
+            kernel = gauss_kernel(kernel_shape[0], sigma)
+
+        out = image_kernel_operation(in_pic, operate_type='linear', kernel=kernel)
+
+    elif kernel_type == 'order_statistic':
+        kernel = np.zeros(shape=kernel_shape)
+        out = image_kernel_operation(in_pic, operate_type='order_statistic', kernel=kernel)
+
+    else:
+        kernel = np.ones(shape=kernel_shape) / (kernel_shape[0] * kernel_shape[1])
+        out = image_kernel_operation(in_pic, operate_type='linear', kernel=kernel)
+
     return out
 
 
-def smoothing_filter(in_pic, kernel_shape, kernel_type='box'):
-    kernel = np.ones(shape=kernel_shape) / (kernel_shape[0] * kernel_shape[1])
-    out = image_convolution(in_pic, kernel)
+def sharpening(in_pic, method='laplacian', blur_method='box', kernel_shape=(3, 3), sigma=1):
+    if method == 'blur':
+        if blur_method == 'gaussian':
+            sharpen_model = in_pic - smoothing_filter(in_pic, kernel_shape, kernel_type='gaussian', sigma=sigma)
+
+        elif blur_method == 'order_statistic':
+            sharpen_model = in_pic - smoothing_filter(in_pic, kernel_shape, kernel_type='order_statistic')
+
+        else:
+            sharpen_model = in_pic - smoothing_filter(in_pic, kernel_shape, kernel_type='box')
+
+    else:
+        laplacian = np.asarray([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]])
+        sharpen_model = image_kernel_operation(in_pic, operate_type='linear', kernel=laplacian)
+
+    out = sharpen_model + in_pic
     return out
+
+
