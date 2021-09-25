@@ -17,6 +17,43 @@ def rgb2gray(in_pic):
     return out
 
 
+# map [in_low, in_high] into [out_low, out_high]
+def grayscale_mapping(in_pic, in_low, in_high, out_low, out_high):
+    slope_1 = out_low / in_low
+    slope_2 = (out_high - out_low) / (in_high - in_low)
+    slope_3 = (255 - out_high) / (255 - in_high)
+    pic_shape = in_pic.shape
+    out = np.zeros(pic_shape)
+    for i in range(pic_shape[0]):
+        for j in range(pic_shape[1]):
+            gray_in = in_pic[i][j]
+            gray_out = 0
+
+            if (gray_in < in_low) and (gray_in > 0):
+                gray_out = round(slope_1 * gray_in)
+
+            elif (gray_in < in_high) and (gray_in > in_low):
+                gray_out = round(out_low + slope_2 * (gray_in - in_low))
+
+            elif (gray_in < 255) and (gray_in > in_high):
+                gray_out = round(out_high + slope_3 * (gray_in - in_high))
+
+            out[i][j] = gray_out
+
+    return out
+
+
+def grayscale_intercept(in_pic):
+    out = in_pic.copy()
+    for i in np.nditer(out, op_flags=['readwrite']):
+        if i < 0:
+            i[...] = 0
+        if i > 255:
+            i[...] = 255
+
+    return out
+
+
 # in_pic is in gray domain.
 def get_histogram(in_pic, scale=256):
     histogram = np.zeros(scale)
@@ -63,27 +100,7 @@ def gamma_transform(in_pic, gamma):
 
 # map [in_low, in_high] into [out_low, out_high]
 def contrast_stretching(in_pic, in_low, in_high, out_low, out_high):
-    slope_1 = out_low / in_low
-    slope_2 = (out_high - out_low) / (in_high - in_low)
-    slope_3 = (255 - out_high) / (255 - in_high)
-    pic_shape = in_pic.shape
-    out = np.zeros(pic_shape)
-    for i in range(pic_shape[0]):
-        for j in range(pic_shape[1]):
-            gray_in = in_pic[i][j]
-            gray_out = 0
-
-            if (gray_in < in_low) and (gray_in > 0):
-                gray_out = round(slope_1 * gray_in)
-
-            elif (gray_in < in_high) and (gray_in > in_low):
-                gray_out = round(out_low + slope_2 * (gray_in - in_low))
-
-            elif (gray_in < 255) and (gray_in > in_high):
-                gray_out = round(out_high + slope_3 * (gray_in - in_high))
-
-            out[i][j] = gray_out
-
+    out = grayscale_mapping(in_pic, in_low, in_high, out_low, out_high)
     out = out.astype(np.uint8)
     return out
 
@@ -186,12 +203,15 @@ def image_kernel_operation(in_pic, operate_type='linear', kernel=None):
                 out[i][j] = round(convolution_sum)
 
     if np.min(out) < 0:
-        out = out - np.min(out)
-        for i in np.nditer(out, op_flags=['readwrite']):
-            if i > 255:
-                i[...] = 255
+        out = grayscale_mapping(out, np.min(out), 0, -255, 0)
 
-    out = out.astype(np.uint8)
+    if np.max(out) > 255:
+        out = grayscale_mapping(out, 0, np.max(out), 0, 255)
+        # out = out - np.min(out)
+        # for i in np.nditer(out, op_flags=['readwrite']):
+        #     if i > 255:
+        #         i[...] = 255
+
     return out[index[0]:index[0] + in_pic_shape[0], index[1]:index[1] + in_pic_shape[1]]
 
 
@@ -241,23 +261,25 @@ def smoothing_filter(in_pic, kernel_shape, kernel_type='box', sigma=1):
         kernel = np.ones(shape=kernel_shape) / (kernel_shape[0] * kernel_shape[1])
         out = image_kernel_operation(in_pic, operate_type='linear', kernel=kernel)
 
+    out = out.astype(np.uint8)
     return out
 
 
 def sharpening(in_pic, method='laplacian', blur_method='box', kernel_shape=(3, 3), sigma=1):
     if method == 'blur':
         if blur_method == 'gaussian':
-            sharpen_model = in_pic - smoothing_filter(in_pic, kernel_shape, kernel_type='gaussian', sigma=sigma)
+            sharpen_model = in_pic.astype(np.float64) - smoothing_filter(in_pic, kernel_shape, kernel_type='gaussian', sigma=sigma)
 
         elif blur_method == 'order_statistic':
-            sharpen_model = in_pic - smoothing_filter(in_pic, kernel_shape, kernel_type='order_statistic')
+            sharpen_model = in_pic.astype(np.float64) - smoothing_filter(in_pic, kernel_shape, kernel_type='order_statistic')
 
         else:
-            sharpen_model = in_pic - smoothing_filter(in_pic, kernel_shape, kernel_type='box')
+            sharpen_model = in_pic.astype(np.float64) - smoothing_filter(in_pic, kernel_shape, kernel_type='box')
 
     else:
         laplacian = np.asarray([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]])
         sharpen_model = image_kernel_operation(in_pic, operate_type='linear', kernel=laplacian)
 
-    out = sharpen_model
+    temp = sharpen_model + in_pic
+    out = grayscale_intercept(temp).astype(np.uint8)
     return out
