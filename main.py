@@ -7,7 +7,7 @@ IMG_PATH = "azur2021527224121.png"
 
 img = cv.imread(IMG_PATH, 0)
 gray_img = Spatial.rgb2gray(img)
-kernel = np.ones((3,3))
-in_pic = np.arange(25).reshape((5,5))
-out = Spatial.image_convolution(in_pic, kernel)
+out = Spatial.sharpening(gray_img, method='blur', blur_method='box')
+cv.imshow('img', out)
+cv.waitKey(0)
 

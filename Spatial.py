@@ -104,7 +104,7 @@ def bit_plane_slicing(in_pic, layer):
     for i in np.nditer(out, op_flags=['readwrite']):
         # bin_value is 8-bit width.
         bin_value = bin(i)[2:].zfill(8)
-        layer_bit = bin_value[-(int(layer)+1)]
+        layer_bit = bin_value[-(int(layer) + 1)]
         i[...] = int(layer_bit) * 255
 
     return out
@@ -140,7 +140,7 @@ def histogram_matching(in_pic, match):
     match_transform = cdf(match)
     match_transform_inverse = np.zeros(match_transform.size, dtype=np.uint8)
     for i in range(match_transform.size):
-        j = match_transform[-i-1]
+        j = match_transform[-i - 1]
         match_transform_inverse[j] = 255 - i
 
     for i in range(match_transform_inverse.size):
@@ -149,7 +149,7 @@ def histogram_matching(in_pic, match):
 
         else:
             if match_transform_inverse[i] == 0:
-                match_transform_inverse[i] = match_transform_inverse[i-1]
+                match_transform_inverse[i] = match_transform_inverse[i - 1]
 
     for i in np.nditer(out, op_flags=['readwrite']):
         i[...] = in_transform[i]
@@ -163,25 +163,25 @@ def histogram_matching(in_pic, match):
 # when operate_type is 'order_statistic', just require kernel's shape.
 def image_kernel_operation(in_pic, operate_type='linear', kernel=None):
     in_pic_shape = in_pic.shape
-    out = np.zeros((in_pic_shape[0] + kernel.shape[0] - 1, in_pic_shape[1] + kernel.shape[1] - 1), dtype=np.int32)
-    index = kernel.shape[0]//2, kernel.shape[1]//2
-    out[index[0]:index[0]+in_pic_shape[0], index[1]:index[1]+in_pic_shape[1]] = in_pic
+    out = np.zeros((in_pic_shape[0] + kernel.shape[0] - 1, in_pic_shape[1] + kernel.shape[1] - 1))
+    index = kernel.shape[0] // 2, kernel.shape[1] // 2
+    out[index[0]:index[0] + in_pic_shape[0], index[1]:index[1] + in_pic_shape[1]] = in_pic
     out_copy = out.copy()
     if operate_type == 'order_statistic':
         for i in range(index[0], in_pic_shape[0] + index[0]):
             for j in range(index[1], in_pic_shape[1] + index[1]):
-                temp = out_copy[i-index[0]:i+index[0], j-index[1]:j+index[1]]
+                temp = out_copy[i - index[0]:i + index[0], j - index[1]:j + index[1]]
                 temp_median = np.median(temp)
                 out[i][j] = temp_median.astype(np.uint8)
 
     else:
-        for i in range(index[0], in_pic_shape[0]+index[0]):
-            for j in range(index[1], in_pic_shape[1]+index[1]):
+        for i in range(index[0], in_pic_shape[0] + index[0]):
+            for j in range(index[1], in_pic_shape[1] + index[1]):
                 convolution_sum = 0
 
-                for s in range(-index[0], index[0]+1):
-                    for t in range(-index[1], index[1]+1):
-                        convolution_sum += out_copy[i-s][j-t] * kernel[index[0]+s][index[1]+t]
+                for s in range(-index[0], index[0] + 1):
+                    for t in range(-index[1], index[1] + 1):
+                        convolution_sum += out_copy[i - s][j - t] * kernel[index[0] + s][index[1] + t]
 
                 out[i][j] = round(convolution_sum)
 
@@ -192,7 +192,7 @@ def image_kernel_operation(in_pic, operate_type='linear', kernel=None):
                 i[...] = 255
 
     out = out.astype(np.uint8)
-    return out[index[0]:index[0]+in_pic_shape[0], index[1]:index[1]+in_pic_shape[1]]
+    return out[index[0]:index[0] + in_pic_shape[0], index[1]:index[1] + in_pic_shape[1]]
 
 
 # generate gaussian kernel, it's always a square.
@@ -259,7 +259,5 @@ def sharpening(in_pic, method='laplacian', blur_method='box', kernel_shape=(3, 3
         laplacian = np.asarray([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]])
         sharpen_model = image_kernel_operation(in_pic, operate_type='linear', kernel=laplacian)
 
-    out = sharpen_model + in_pic
+    out = sharpen_model
     return out
-
-
