@@ -17,13 +17,30 @@ def rgb2gray(in_pic):
     return out
 
 
+def resize(in_pic, resize_shape, interpolation='linear'):
+    out = np.zeros(shape=resize_shape, dtype=np.uint8)
+    in_size = in_pic.shape
+    x_distance = float(in_size[0]) / resize_shape[0]
+    y_distance = float(in_size[1]) / resize_shape[1]
+    if interpolation == 'cubic':
+        pass
+
+    else:
+        for i in range(resize_shape[0]):
+            for j in range(resize_shape[1]):
+                x, y = round(i * x_distance), round(j * y_distance)
+                out[i][j] = in_pic[x][y]
+
+    return out
+
+
 # map [in_low, in_high] into [out_low, out_high]
 def grayscale_mapping(in_pic, in_low, in_high, out_low, out_high):
     slope_1 = out_low / in_low
     slope_2 = (out_high - out_low) / (in_high - in_low)
     slope_3 = (255 - out_high) / (255 - in_high)
     pic_shape = in_pic.shape
-    out = np.zeros(pic_shape)
+    out = np.zeros(pic_shape, dtype=np.float64)
     for i in range(pic_shape[0]):
         for j in range(pic_shape[1]):
             gray_in = in_pic[i][j]
@@ -98,7 +115,7 @@ def gamma_transform(in_pic, gamma):
     return out
 
 
-# map [in_low, in_high] into [out_low, out_high]
+# map [in_low, in_high] into [out_low, out_high], but out's dtype is uint8.
 def contrast_stretching(in_pic, in_low, in_high, out_low, out_high):
     out = grayscale_mapping(in_pic, in_low, in_high, out_low, out_high)
     out = out.astype(np.uint8)
