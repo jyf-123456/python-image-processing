@@ -4,6 +4,7 @@
 """
 
 import numpy as np
+import math
 
 
 def rgb2gray(in_pic):
@@ -17,13 +18,21 @@ def rgb2gray(in_pic):
     return out
 
 
-def resize(in_pic, resize_shape, interpolation='linear'):
+def resize(in_pic, resize_shape, method='nearest'):
     out = np.zeros(shape=resize_shape, dtype=np.uint8)
     in_size = in_pic.shape
     x_distance = float(in_size[0]) / resize_shape[0]
     y_distance = float(in_size[1]) / resize_shape[1]
-    if interpolation == 'cubic':
-        pass
+    if method == 'bilinear':
+        for i in range(resize_shape[0]):
+            for j in range(resize_shape[1]):
+                x, y = i * x_distance, j * y_distance
+                x1, x2 = math.floor(x), math.ceil(x)
+                y1, y2 = math.floor(y), math.ceil(y)
+                f_1y = (float(in_pic[x1][y2]) - in_pic[x1][y1]) * (y - y1) + in_pic[x1][y1]
+                f_2y = (float(in_pic[x2][y2]) - in_pic[x2][y1]) * (y - y1) + in_pic[x2][y1]
+                f_xy = (f_2y - f_1y) * (x - x1) + f_1y
+                out[i][j] = round(f_xy)
 
     else:
         for i in range(resize_shape[0]):
@@ -219,15 +228,12 @@ def image_kernel_operation(in_pic, operate_type='linear', kernel=None):
 
                 out[i][j] = round(convolution_sum)
 
+    temp_max = max(np.max(out), abs(np.min(out)))
     if np.min(out) < 0:
-        out = grayscale_mapping(out, np.min(out), 0, -255, 0)
+        out = grayscale_mapping(out, -temp_max, 0, -255, 0)
 
     if np.max(out) > 255:
-        out = grayscale_mapping(out, 0, np.max(out), 0, 255)
-        # out = out - np.min(out)
-        # for i in np.nditer(out, op_flags=['readwrite']):
-        #     if i > 255:
-        #         i[...] = 255
+        out = grayscale_mapping(out, 0, temp_max, 0, 255)
 
     return out[index[0]:index[0] + in_pic_shape[0], index[1]:index[1] + in_pic_shape[1]]
 
@@ -285,18 +291,33 @@ def smoothing_filter(in_pic, kernel_shape, kernel_type='box', sigma=1):
 def sharpening(in_pic, method='laplacian', blur_method='box', kernel_shape=(3, 3), sigma=1):
     if method == 'blur':
         if blur_method == 'gaussian':
-            sharpen_model = in_pic.astype(np.float64) - smoothing_filter(in_pic, kernel_shape, kernel_type='gaussian', sigma=sigma)
+            sharpen_model = in_pic.astype(np.float64) - smoothing_filter(in_pic, kernel_shape, kernel_type='gaussian',
+                                                                         sigma=sigma)
 
         elif blur_method == 'order_statistic':
-            sharpen_model = in_pic.astype(np.float64) - smoothing_filter(in_pic, kernel_shape, kernel_type='order_statistic')
+            sharpen_model = in_pic.astype(np.float64) - smoothing_filter(in_pic, kernel_shape,
+                                                                         kernel_type='order_statistic')
 
         else:
             sharpen_model = in_pic.astype(np.float64) - smoothing_filter(in_pic, kernel_shape, kernel_type='box')
 
+    elif method == 'gradiant':
+        # use sobel operator.
+        sobel_x = np.asarray([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
+        sobel_y = np.asarray([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+        sharpen_model_x = image_kernel_operation(in_pic, operate_type='linear', kernel=sobel_x)
+        sharpen_model_y = image_kernel_operation(in_pic, operate_type='linear', kernel=sobel_y)
+        sharpen_model = sharpen_model_x + sharpen_model_y
+
     else:
+        # use laplace operator.
         laplacian = np.asarray([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]])
         sharpen_model = image_kernel_operation(in_pic, operate_type='linear', kernel=laplacian)
 
     temp = sharpen_model + in_pic
     out = grayscale_intercept(temp).astype(np.uint8)
     return out
+
+
+def laplace_image(in_pic):
+    laplacian = np.asarray([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]])

@@ -7,7 +7,7 @@ IMG_PATH = "test.jpg"
 
 img = cv.imread(IMG_PATH, 0)
 gray_img = Spatial.rgb2gray(img)
-out = Spatial.resize(gray_img, (100, 100))
+out = Spatial.sharpening(gray_img, method='laplacian', kernel_shape=(3, 3))
 cv.imshow('img', gray_img)
 cv.imshow('1', out)
 cv.waitKey(0)
