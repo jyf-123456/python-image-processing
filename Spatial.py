@@ -45,9 +45,19 @@ def resize(in_pic, resize_shape, method='nearest'):
 
 # map [in_low, in_high] into [out_low, out_high]
 def grayscale_mapping(in_pic, in_low, in_high, out_low, out_high):
-    slope_1 = out_low / in_low
+    if in_low == 0:
+        slope_1 = 0
+
+    else:
+        slope_1 = out_low / in_low
+
     slope_2 = (out_high - out_low) / (in_high - in_low)
-    slope_3 = (255 - out_high) / (255 - in_high)
+    if in_high == 255:
+        slope_3 = 0
+
+    else:
+        slope_3 = (255 - out_high) / (255 - in_high)
+
     pic_shape = in_pic.shape
     out = np.zeros(pic_shape, dtype=np.float64)
     for i in range(pic_shape[0]):
@@ -69,6 +79,7 @@ def grayscale_mapping(in_pic, in_low, in_high, out_low, out_high):
     return out
 
 
+# negative value will be 0, and value bigger than 255 will just be 255.
 def grayscale_intercept(in_pic):
     out = in_pic.copy()
     for i in np.nditer(out, op_flags=['readwrite']):
@@ -319,5 +330,30 @@ def sharpening(in_pic, method='laplacian', blur_method='box', kernel_shape=(3, 3
     return out
 
 
-def laplace_image(in_pic):
-    laplacian = np.asarray([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]])
+# method gives the way that process negative value of convolution image
+def conv_image(in_pic, kernel_type='laplacian', method='scale'):
+    if kernel_type == 'gradiant':
+        sobel_x = np.asarray([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
+        conv_result_x = image_kernel_operation(in_pic, operate_type='linear', kernel=sobel_x)
+        sobel_y = np.asarray([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+        conv_result_y = image_kernel_operation(in_pic, operate_type='linear', kernel=sobel_y)
+        conv_result = conv_result_x + conv_result_y
+
+    else:
+        laplacian = np.asarray([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]])
+        conv_result = image_kernel_operation(in_pic, operate_type='linear', kernel=laplacian)
+
+    if np.min(conv_result) < 0:
+        if method == 'intercept':
+            for i in np.nditer(conv_result, op_flags=['readwrite']):
+                if i < 0:
+                    i[...] = 0
+
+        else:
+            conv_result = conv_result - np.min(conv_result)
+
+    if np.max(conv_result) > 255:
+        conv_result = grayscale_mapping(conv_result, 0, np.max(conv_result), 0, 255)
+
+    conv_result = conv_result.astype(np.uint8)
+    return conv_result
